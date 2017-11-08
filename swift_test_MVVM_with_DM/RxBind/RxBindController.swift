@@ -7,18 +7,23 @@
 //
 
 import UIKit
+import RxSwift
+import RxCocoa
 
 protocol RxBindViewModelInteracting {
-    var numberOfRows: Int { get }
-    func text(at indexPath: IndexPath) -> String?
+    var words: Variable<[String]> { get }
     func didSelectRow(at indexPath: IndexPath)
 }
 
-class RxBindController: BaseViewController<RxBindViewModel>, UITableViewDataSource, UITableViewDelegate {
+class RxBindController: BaseViewController<RxBindViewModel> {
     
     // MARK: - Outlets
     
     @IBOutlet weak var tableView: UITableView!
+    
+    // MARK: - Properties
+    
+    private let bag = DisposeBag()
     
     // MARK: - Life cycle
     
@@ -28,28 +33,17 @@ class RxBindController: BaseViewController<RxBindViewModel>, UITableViewDataSour
         title = "RxBindController"
         
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
-        tableView.dataSource = self
-        tableView.delegate = self
-    }
-    
-    // MARK: - UITableViewDataSource
-    
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return viewModel.numberOfRows
-    }
-    
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
-        cell.textLabel?.text = indexPath.description
-        cell.textLabel?.text = viewModel.text(at: indexPath)
-        return cell
-    }
-    
-    // MARK: - UITableViewDelegate
-    
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        viewModel.didSelectRow(at: indexPath)
+        
+        viewModel.words.asObservable().bind(to: tableView.rx.items(cellIdentifier: "cell")) {
+            (i, str, cell) in
+            cell.textLabel?.text = str
+            }.disposed(by: bag)
+        
+        tableView.rx.itemSelected.asObservable()
+            .subscribe(onNext: {
+                [weak self] (indexPath) in
+                self?.tableView.deselectRow(at: indexPath, animated: true)
+                self?.viewModel.didSelectRow(at: indexPath)
+            }).disposed(by: bag)
     }
 }
-
